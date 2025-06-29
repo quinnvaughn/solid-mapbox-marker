@@ -1,0 +1,1 @@
+I wanted to play around with Mapbox to learn how to do some things. This is very simple: pick a location on a map, add a title and description, and it will display it. 
