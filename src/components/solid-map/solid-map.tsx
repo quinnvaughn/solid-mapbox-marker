@@ -1,10 +1,15 @@
-import mapboxgl from 'mapbox-gl'
+import mapboxgl, {
+  LayerSpecification,
+  MapMouseEventType,
+  MapMouseEvent,
+} from 'mapbox-gl'
 import {
   createContext,
   createSignal,
   onCleanup,
   onMount,
   Show,
+  splitProps,
   useContext,
 } from 'solid-js'
 import { render as solidRender } from 'solid-js/web'
@@ -80,7 +85,16 @@ type VectorSourceProps = {
   url: string
 }
 
-type SourceProps = GeoJSONSourceProps | VectorSourceProps
+type RasterDemSourceProps = {
+  id: string
+  type: 'raster-dem'
+  url: string
+  tileSize?: number
+  maxzoom?: number
+  exaggeration?: number
+}
+
+type SourceProps = GeoJSONSourceProps | VectorSourceProps | RasterDemSourceProps
 
 SolidMap.Source = function Source(props: SourceProps) {
   const map = useMapboxContext()
@@ -97,14 +111,124 @@ SolidMap.Source = function Source(props: SourceProps) {
           ...props,
         })
       })
+      .with({ type: 'raster-dem' }, (props) => {
+        const addDem = () => {
+          map.addSource(props.id, {
+            type: 'raster-dem',
+            url: props.url,
+            tileSize: props.tileSize || 512,
+            maxzoom: props.maxzoom || 14,
+          })
+          map.setTerrain({
+            source: props.id,
+            exaggeration: props.exaggeration || 1.0,
+          })
+        }
+        if (map.isStyleLoaded()) {
+          addDem()
+        } else {
+          map.once('style.load', addDem)
+        }
+      })
       .exhaustive()
 
     onCleanup(() => {
-      if (map.getSource(props.id)) {
-        map.removeSource(props.id)
+      function doRemoveLayer() {
+        if (map.getLayer(props.id)) {
+          map.removeLayer(props.id)
+        }
+      }
+
+      // mirror the mount logic so we don’t try to remove before style loads
+      if (map.isStyleLoaded()) {
+        doRemoveLayer()
+      } else {
+        map.once('load', doRemoveLayer)
       }
     })
   })
+  return null
+}
+
+type LayerProps = LayerSpecification & {
+  before?: string
+}
+
+SolidMap.Layer = function Layer(props: LayerProps) {
+  const map = useMapboxContext()
+  const [beforeProps, layerSpec] = splitProps(props, ['before'])
+
+  onMount(() => {
+    function doAddLayer() {
+      if (map.getLayer(props.id)) {
+        console.warn(`Layer with id ${props.id} already exists`)
+        return
+      }
+      map.addLayer(layerSpec, beforeProps.before)
+    }
+    if (map.isStyleLoaded()) {
+      doAddLayer()
+    } else {
+      map.once('style.load', doAddLayer)
+    }
+  })
+
+  onCleanup(() => {
+    if (map.getLayer(props.id)) {
+      map.removeLayer(props.id)
+    }
+  })
+
+  return null
+}
+
+type EventProps = {
+  event: MapMouseEventType
+  layer?: string
+  handler: (e: MapMouseEvent) => void
+  once?: boolean
+}
+
+SolidMap.Event = function Event(props: EventProps) {
+  const map = useMapboxContext()
+  let unbind: (() => void) | null = null
+
+  onMount(() => {
+    const method = props.once ? map.once.bind(map) : map.on.bind(map)
+    const bind = () => {
+      if (props.layer) {
+        method(props.event, props.layer, props.handler)
+      } else {
+        method(props.event, props.handler)
+      }
+
+      unbind = () => {
+        if (props.layer) {
+          map.off(props.event, props.layer, props.handler)
+        } else {
+          map.off(props.event, props.handler)
+        }
+      }
+    }
+
+    if (props.layer) {
+      const waitForLayer = () => {
+        if (map.getLayer(props.layer!)) {
+          bind()
+        } else {
+          map.once('styledata', waitForLayer)
+        }
+      }
+      waitForLayer()
+    } else {
+      bind()
+    }
+  })
+
+  onCleanup(() => {
+    unbind?.()
+  })
+
   return null
 }
 
