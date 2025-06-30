@@ -38,7 +38,8 @@ export default function SolidMap(props: Props) {
     if (!container) return
     const mb = new mapboxgl.Map({
       container: container,
-      style: 'mapbox://styles/mapbox/standard',
+      // style: 'mapbox://styles/mapbox/standard',
+      style: 'mapbox://styles/mapbox/streets-v11',
       center: [props.longitude, props.latitude],
       zoom: props.zoom || 10,
       pitch: 60,

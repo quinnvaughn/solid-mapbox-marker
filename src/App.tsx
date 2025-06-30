@@ -1,11 +1,11 @@
 import { type Component } from 'solid-js'
 import { SolidMap } from './components/solid-map'
-import MapContent from './components/map-content'
+import { RoadHighlighter } from './components/road-highlighter'
 
 const App: Component = () => {
   return (
     <SolidMap longitude={-118.4912} latitude={34.0119}>
-      <MapContent />
+      <RoadHighlighter />
     </SolidMap>
   )
 }
