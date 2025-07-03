@@ -1,23 +1,12 @@
+import { createSignal } from 'solid-js'
 import SolidMap, { useMapboxContext } from '../solid-map/solid-map'
 
 export default function RoadHighlighter() {
   const map = useMapboxContext()
+  const [layerIds, setLayerIds] = createSignal<string[]>([])
+
   return (
     <>
-      <SolidMap.Event
-        event="click"
-        handler={(e) => {
-          const hits = map.queryRenderedFeatures(e.point)
-          const roads = hits.filter(
-            (f) =>
-              f.layer?.source === 'composite' &&
-              f.layer['source-layer'] === 'road'
-          )
-          if (!roads.length) return
-          const roadId = roads[0].id
-          map.setFilter('highlighted-road', ['==', ['id'], roadId])
-        }}
-      />
       <SolidMap.Layer
         id="highlighted-road"
         type="line"
@@ -37,6 +26,36 @@ export default function RoadHighlighter() {
         }}
         filter={['==', ['id'], '']}
         before="road-label"
+      />
+      <SolidMap.OnLoad
+        once
+        handler={() => {
+          const ids = map
+            .getStyle()
+            .layers!.filter(
+              (l) =>
+                l.source === 'composite' &&
+                (l as any)['source-layer'] === 'road'
+            )
+            .map((l) => l.id)
+          setLayerIds(ids)
+        }}
+      />
+      <SolidMap.Click
+        handler={(e) => {
+          const hits = map.queryRenderedFeatures(e.point, {
+            layers: layerIds(),
+          })
+          if (!hits.length) return
+          const clickedName = hits[0].properties?.name as string
+          if (!clickedName) return
+
+          map.setFilter('highlighted-road', [
+            '==',
+            ['get', 'name'],
+            clickedName,
+          ])
+        }}
       />
     </>
   )

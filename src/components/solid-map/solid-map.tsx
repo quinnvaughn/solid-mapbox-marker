@@ -277,3 +277,50 @@ SolidMap.Marker = function Marker<T>(props: MarkerProps<T>) {
 
   return null
 }
+
+type OnLoadProps = {
+  once?: boolean
+  handler: () => void
+}
+
+SolidMap.OnLoad = function OnLoad(props: OnLoadProps) {
+  const map = useMapboxContext()
+
+  onMount(() => {
+    const method = props.once ? map.once.bind(map) : map.on.bind(map)
+    method('load', props.handler)
+  })
+
+  onCleanup(() => {
+    map.off('load', props.handler)
+  })
+
+  return null
+}
+
+type ClickProps = {
+  layer?: string
+  handler: (e: MapMouseEvent) => void
+}
+
+SolidMap.Click = function Click(props: ClickProps) {
+  const map = useMapboxContext()
+
+  onMount(() => {
+    if (props.layer) {
+      map.on('click', props.layer, props.handler)
+    } else {
+      map.on('click', props.handler)
+    }
+  })
+
+  onCleanup(() => {
+    if (props.layer) {
+      map.off('click', props.layer, props.handler)
+    } else {
+      map.off('click', props.handler)
+    }
+  })
+
+  return null
+}
